@@ -43,6 +43,8 @@ def render_map() -> Path:
     return MAP_PATH
 
 
+def draw_turtle_map(taken_choices: List[tuple[str, str]]) -> bool:
+    """Open a turtle window summarizing the user's chosen path."""
 def draw_turtle_map() -> bool:
     """Open a turtle window showing Eli's route west. Returns True if drawn."""
     try:
@@ -50,6 +52,7 @@ def draw_turtle_map() -> bool:
 
         screen = turtle.Screen()
         screen.title("Eli's Journey: Michigan to Las Vegas")
+        screen.setup(width=980, height=560)
         screen.setup(width=900, height=520)
         screen.bgcolor("midnight blue")
 
@@ -60,6 +63,22 @@ def draw_turtle_map() -> bool:
         route.pensize(4)
 
         points = {
+            "Lansing": (-340, 140),
+            "Chicago": (-240, 80),
+            "Denver": (-50, 40),
+            "Las Vegas": (240, -40),
+        }
+
+        accepted_offer = any("Accept the job offer" in c[1] for c in taken_choices)
+        visited_cities = ["Lansing"]
+
+        if accepted_offer:
+            visited_cities.extend(["Chicago", "Denver", "Las Vegas"])
+
+        route.penup()
+        route.goto(points[visited_cities[0]])
+        route.pendown()
+        for city in visited_cities[1:]:
             "Lansing": (-320, 120),
             "Chicago": (-220, 60),
             "Denver": (-50, 40),
@@ -76,6 +95,8 @@ def draw_turtle_map() -> bool:
         marker.hideturtle()
         marker.speed("fastest")
         marker.color("white")
+        for city in visited_cities:
+            coords = points[city]
         for city, coords in points.items():
             marker.penup()
             marker.goto(coords)
@@ -87,6 +108,21 @@ def draw_turtle_map() -> bool:
         legend.hideturtle()
         legend.color("light sky blue")
         legend.penup()
+        legend.goto(-460, -230)
+        legend.write(
+            "Click anywhere in the window to close. Your selections:",
+            font=("Arial", 13, "bold"),
+        )
+
+        text_y = -255
+        legend.goto(-460, text_y)
+        for idx, (title, description) in enumerate(taken_choices, start=1):
+            legend.goto(-460, text_y + idx * 18)
+            legend.write(
+                f"{idx}. {title}: {description}",
+                font=("Arial", 11, "normal"),
+            )
+
         legend.goto(-380, -200)
         legend.write(
             "Click anywhere in the window to close the route view.",
@@ -249,6 +285,10 @@ def play_story(
     scripted_choices: List[str] | None = None,
     auto_turtle: bool = False,
 ) -> None:
+    current = "offer"
+    script_index = 0
+    taken_choices: List[tuple[str, str]] = []
+    reached_ending = False
 def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None = None) -> None:
     current = "offer"
     script_index = 0
@@ -260,6 +300,9 @@ def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None =
 
         if not node.choices:
             print("The adventure ends here. Thanks for guiding Eli!\n")
+            reached_ending = True
+            break
+
             break
 
         if current == "travel_method" and not map_announced:
@@ -291,6 +334,32 @@ def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None =
             print("You chose to quit. Safe travels, wherever they lead.\n")
             break
 
+        selected_choice = next((c for c in node.choices if c.key == user_choice), None)
+        if selected_choice is None:
+            print("Invalid choice. Please try again.")
+            continue
+
+        taken_choices.append((node.title, selected_choice.description))
+        current = selected_choice.target
+        script_index += 1
+
+    if taken_choices and reached_ending:
+        map_path = render_map()
+        print(f"A simple map of Eli's journey was saved to: {map_path}")
+
+        if auto_turtle:
+            print("Opening a turtle summary of your path... Close the window when done.\n")
+            draw_turtle_map(taken_choices)
+        elif scripted_choices is None:
+            wants_turtle = input(
+                "Would you like to open a turtle summary of your choices? (Y/N): "
+            ).strip().upper()
+            if wants_turtle == "Y":
+                print("Launching turtle visualization. Close the window to continue.\n")
+                draw_turtle_map(taken_choices)
+        else:
+            print("Turtle visualization skipped (demo mode). Use --turtle to auto-open.\n")
+
         next_node = next((c.target for c in node.choices if c.key == user_choice), None)
         if next_node is None:
             print("Invalid choice. Please try again.")
@@ -310,6 +379,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "--turtle",
         action="store_true",
+        help="Automatically open the turtle summary window after the story ends.",
         help="Automatically open the turtle route view once the job offer is accepted.",
     )
     return parser.parse_args(argv)
