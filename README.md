@@ -5,6 +5,8 @@ This Python adventure engine follows Eli Klunder after graduating from Michigan 
 ## Features
 - **Interactive branching narrative** with multiple endings and meaningful options at each step.
 - **Quit option** available on every prompt.
+- **ASCII route map** automatically generated at `journey_map.txt` after a playthrough to provide a simple visual of the move.
+- **Optional turtle visualization** that summarizes the exact choices you made at the end of the story.
 - **ASCII route map** automatically generated at `journey_map.txt` once the job offer is accepted to provide a simple visual of the move.
 - **Optional turtle visualization** that plots the journey from Lansing to Las Vegas when you accept the job offer.
 - **Modular structure** using data classes for story nodes and choices, keeping content separate from the engine logic.
@@ -14,6 +16,14 @@ This Python adventure engine follows Eli Klunder after graduating from Michigan 
 ```bash
 python main.py              # Play interactively
 python main.py --demo       # Auto-play a sample path (useful for grading or quick checks)
+python main.py --turtle     # Auto-open the turtle summary window after the story ends
+```
+
+When playing interactively, enter the number for a choice or `Q` to exit at any time. After the story finishes, you'll be prompted to open a turtle window summarizing your choices (or you can auto-open it with `--turtle`). The generated ASCII map can be opened with any text editor.
+
+## Project organization
+- `main.py` contains the engine logic, story graph, input handling, and map generation. Story content is defined in `build_story()` while navigation and I/O are handled by `play_story()`.
+- `journey_map.txt` is created on demand when a playthrough reaches an ending.
 python main.py --turtle     # Auto-open the turtle route view when the offer is accepted
 ```
 
