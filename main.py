@@ -249,7 +249,6 @@ def play_story(
     scripted_choices: List[str] | None = None,
     auto_turtle: bool = False,
 ) -> None:
-def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None = None) -> None:
     current = "offer"
     script_index = 0
     map_announced = False
