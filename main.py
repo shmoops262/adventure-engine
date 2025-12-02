@@ -43,6 +43,63 @@ def render_map() -> Path:
     return MAP_PATH
 
 
+def draw_turtle_map() -> bool:
+    """Open a turtle window showing Eli's route west. Returns True if drawn."""
+    try:
+        import turtle
+
+        screen = turtle.Screen()
+        screen.title("Eli's Journey: Michigan to Las Vegas")
+        screen.setup(width=900, height=520)
+        screen.bgcolor("midnight blue")
+
+        route = turtle.Turtle()
+        route.hideturtle()
+        route.speed("fastest")
+        route.color("gold")
+        route.pensize(4)
+
+        points = {
+            "Lansing": (-320, 120),
+            "Chicago": (-220, 60),
+            "Denver": (-50, 40),
+            "Las Vegas": (230, -40),
+        }
+
+        route.penup()
+        route.goto(points["Lansing"])
+        route.pendown()
+        for city in ("Chicago", "Denver", "Las Vegas"):
+            route.goto(points[city])
+
+        marker = turtle.Turtle()
+        marker.hideturtle()
+        marker.speed("fastest")
+        marker.color("white")
+        for city, coords in points.items():
+            marker.penup()
+            marker.goto(coords)
+            marker.dot(16, "orange")
+            marker.goto(coords[0], coords[1] + 12)
+            marker.write(city, align="center", font=("Arial", 11, "bold"))
+
+        legend = turtle.Turtle()
+        legend.hideturtle()
+        legend.color("light sky blue")
+        legend.penup()
+        legend.goto(-380, -200)
+        legend.write(
+            "Click anywhere in the window to close the route view.",
+            font=("Arial", 12, "normal"),
+        )
+
+        screen.exitonclick()
+        return True
+    except Exception as exc:  # noqa: BLE001
+        print(f"Unable to open turtle visualization: {exc}")
+        return False
+
+
 def build_story() -> Dict[str, StoryNode]:
     return {
         "offer": StoryNode(
@@ -187,6 +244,11 @@ def prompt_choice(node: StoryNode, allow_quit: bool = True) -> str:
     return input("Your choice: ").strip().upper()
 
 
+def play_story(
+    nodes: Dict[str, StoryNode],
+    scripted_choices: List[str] | None = None,
+    auto_turtle: bool = False,
+) -> None:
 def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None = None) -> None:
     current = "offer"
     script_index = 0
@@ -204,6 +266,17 @@ def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None =
             map_path = render_map()
             print(f"A simple map of Eli's journey was generated at: {map_path}\n")
             map_announced = True
+
+            if auto_turtle:
+                print("Opening a turtle route view... Close the window to continue.\n")
+                draw_turtle_map()
+            elif scripted_choices is None:
+                wants_turtle = input(
+                    "Would you like to open a turtle window of the route? (Y/N): "
+                ).strip().upper()
+                if wants_turtle == "Y":
+                    print("Launching turtle visualization. Close the window to continue.\n")
+                    draw_turtle_map()
 
         user_choice = (
             scripted_choices[script_index].upper()
@@ -234,6 +307,11 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         action="store_true",
         help="Automatically play through a sample path without interactive input.",
     )
+    parser.add_argument(
+        "--turtle",
+        action="store_true",
+        help="Automatically open the turtle route view once the job offer is accepted.",
+    )
     return parser.parse_args(argv)
 
 
@@ -241,6 +319,7 @@ def main(argv: List[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     nodes = build_story()
     demo_choices = ["1", "1", "2", "1", "1", "1", "1", "1"] if args.demo else None
+    play_story(nodes, scripted_choices=demo_choices, auto_turtle=args.turtle)
     play_story(nodes, scripted_choices=demo_choices)
     return 0
 
