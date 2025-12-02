@@ -2,7 +2,7 @@ import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple, Optional
 
 MAP_PATH = Path("journey_map.txt")
 
@@ -43,16 +43,18 @@ def render_map() -> Path:
     return MAP_PATH
 
 
-def draw_turtle_map(taken_choices: List[tuple[str, str]]) -> bool:
-    """Open a turtle window summarizing the user's chosen path."""
-def draw_turtle_map() -> bool:
-    """Open a turtle window showing Eli's route west. Returns True if drawn."""
+def draw_turtle_map(taken_choices: Optional[List[Tuple[str, str]]] = None) -> bool:
+    """Open a turtle window summarizing the user's chosen path.
+
+    `taken_choices` may be None (show only the route) or a list of
+    (section title, choice description) pairs to display in a legend.
+    Returns True if the window was shown, False on failure.
+    """
     try:
         import turtle
 
         screen = turtle.Screen()
         screen.title("Eli's Journey: Michigan to Las Vegas")
-        screen.setup(width=980, height=560)
         screen.setup(width=900, height=520)
         screen.bgcolor("midnight blue")
 
@@ -69,34 +71,25 @@ def draw_turtle_map() -> bool:
             "Las Vegas": (240, -40),
         }
 
-        accepted_offer = any("Accept the job offer" in c[1] for c in taken_choices)
-        visited_cities = ["Lansing"]
+        taken_choices = taken_choices or []
+        accepted_offer = any("Accept the job offer" in desc for (_title, desc) in taken_choices)
 
+        visited_cities = ["Lansing"]
         if accepted_offer:
             visited_cities.extend(["Chicago", "Denver", "Las Vegas"])
 
+        # Draw the polyline for the visited cities
         route.penup()
         route.goto(points[visited_cities[0]])
         route.pendown()
         for city in visited_cities[1:]:
-            "Lansing": (-320, 120),
-            "Chicago": (-220, 60),
-            "Denver": (-50, 40),
-            "Las Vegas": (230, -40),
-        }
-
-        route.penup()
-        route.goto(points["Lansing"])
-        route.pendown()
-        for city in ("Chicago", "Denver", "Las Vegas"):
             route.goto(points[city])
 
+        # Draw city markers and labels
         marker = turtle.Turtle()
         marker.hideturtle()
         marker.speed("fastest")
         marker.color("white")
-        for city in visited_cities:
-            coords = points[city]
         for city, coords in points.items():
             marker.penup()
             marker.goto(coords)
@@ -104,6 +97,7 @@ def draw_turtle_map() -> bool:
             marker.goto(coords[0], coords[1] + 12)
             marker.write(city, align="center", font=("Arial", 11, "bold"))
 
+        # Legend / selections
         legend = turtle.Turtle()
         legend.hideturtle()
         legend.color("light sky blue")
@@ -115,25 +109,79 @@ def draw_turtle_map() -> bool:
         )
 
         text_y = -255
-        legend.goto(-460, text_y)
         for idx, (title, description) in enumerate(taken_choices, start=1):
             legend.goto(-460, text_y + idx * 18)
-            legend.write(
-                f"{idx}. {title}: {description}",
-                font=("Arial", 11, "normal"),
-            )
+            legend.write(f"{idx}. {title}: {description}", font=("Arial", 11, "normal"))
 
         legend.goto(-380, -200)
-        legend.write(
-            "Click anywhere in the window to close the route view.",
-            font=("Arial", 12, "normal"),
-        )
+        legend.write("Click anywhere in the window to close the route view.", font=("Arial", 12, "normal"))
 
         screen.exitonclick()
         return True
     except Exception as exc:  # noqa: BLE001
         print(f"Unable to open turtle visualization: {exc}")
-        return False
+        # Fallback: create a simple HTML+SVG visualization and open it in the browser.
+        try:
+            import webbrowser
+
+            file_path = Path("journey_route.html")
+            # Prepare SVG coordinates (flip Y for SVG coordinate system)
+            width, height = 900, 520
+            cx, cy = width // 2, height // 2
+            scale = 1
+
+            def svgy(x, y):
+                return f"{cx + int(x * scale)},{cy - int(y * scale)}"
+
+            points_list = [
+                ("Lansing", -340, 140),
+                ("Chicago", -240, 80),
+                ("Denver", -50, 40),
+                ("Las Vegas", 240, -40),
+            ]
+
+            pts = {name: (x, y) for name, x, y in points_list}
+            visited = ["Lansing"]
+            if any("Accept the job offer" in desc for (_t, desc) in taken_choices):
+                visited.extend(["Chicago", "Denver", "Las Vegas"])
+
+            poly_points = " ".join(svgy(*pts[c]) for c in visited)
+
+            markers = []
+            for name, (x, y) in pts.items():
+                markers.append(f"<circle cx=\"{svgy(x,y).split(',')[0]}\" cy=\"{svgy(x,y).split(',')[1]}\" r=\"8\" fill=\"orange\"/>\n")
+                markers.append(f"<text x=\"{svgy(x,y).split(',')[0]}\" y=\"{int(svgy(x,y).split(',')[1]) - 12}\" font-size=\"12\" fill=\"white\" text-anchor=\"middle\">{name}</text>\n")
+
+            legend_lines = []
+            for idx, (title, description) in enumerate(taken_choices or [], start=1):
+                legend_lines.append(f"<div>{idx}. <strong>{title}</strong>: {description}</div>")
+
+            html_parts = []
+            html_parts.append(f"""<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Eli's Journey - Fallback View</title></head>
+<body style="background:#001; color:#ddd; font-family:Arial,Helvetica,sans-serif;">
+<h2 style="color:#fff;">Eli's Journey - Fallback Route View</h2>
+<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" style="background:midnightblue; display:block; margin:8px 0;">
+  <polyline points="{poly_points}" fill="none" stroke="gold" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+""")
+            html_parts.append("\n".join(markers))
+            html_parts.append("</svg>\n")
+            html_parts.append(f"<div style=\"margin-top:10px;color:#cfe;\">{''.join(legend_lines)}</div>\n")
+            html_parts.append("</body></html>")
+            html_content = "".join(html_parts)
+
+            file_path.write_text(html_content, encoding="utf-8")
+            try:
+                webbrowser.open(file_path.resolve().as_uri())
+            except Exception:
+                # If opening the browser fails, just inform the user where the file is.
+                pass
+            print(f"Fallback route visualization saved to: {file_path.resolve()}")
+            return True
+        except Exception as exc2:
+            print(f"Also failed to create fallback visualization: {exc2}")
+            return False
 
 
 def build_story() -> Dict[str, StoryNode]:
@@ -282,16 +330,13 @@ def prompt_choice(node: StoryNode, allow_quit: bool = True) -> str:
 
 def play_story(
     nodes: Dict[str, StoryNode],
-    scripted_choices: List[str] | None = None,
+    scripted_choices: Optional[List[str]] = None,
     auto_turtle: bool = False,
 ) -> None:
     current = "offer"
     script_index = 0
-    taken_choices: List[tuple[str, str]] = []
+    taken_choices: List[Tuple[str, str]] = []
     reached_ending = False
-def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None = None) -> None:
-    current = "offer"
-    script_index = 0
     map_announced = False
 
     while True:
@@ -303,8 +348,6 @@ def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None =
             reached_ending = True
             break
 
-            break
-
         if current == "travel_method" and not map_announced:
             map_path = render_map()
             print(f"A simple map of Eli's journey was generated at: {map_path}\n")
@@ -314,9 +357,7 @@ def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None =
                 print("Opening a turtle route view... Close the window to continue.\n")
                 draw_turtle_map()
             elif scripted_choices is None:
-                wants_turtle = input(
-                    "Would you like to open a turtle window of the route? (Y/N): "
-                ).strip().upper()
+                wants_turtle = input("Would you like to open a turtle window of the route? (Y/N): ").strip().upper()
                 if wants_turtle == "Y":
                     print("Launching turtle visualization. Close the window to continue.\n")
                     draw_turtle_map()
@@ -343,6 +384,7 @@ def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None =
         current = selected_choice.target
         script_index += 1
 
+    # After the loop, optionally show a map/summary of the taken path
     if taken_choices and reached_ending:
         map_path = render_map()
         print(f"A simple map of Eli's journey was saved to: {map_path}")
@@ -351,22 +393,12 @@ def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None =
             print("Opening a turtle summary of your path... Close the window when done.\n")
             draw_turtle_map(taken_choices)
         elif scripted_choices is None:
-            wants_turtle = input(
-                "Would you like to open a turtle summary of your choices? (Y/N): "
-            ).strip().upper()
+            wants_turtle = input("Would you like to open a turtle summary of your choices? (Y/N): ").strip().upper()
             if wants_turtle == "Y":
                 print("Launching turtle visualization. Close the window to continue.\n")
                 draw_turtle_map(taken_choices)
         else:
             print("Turtle visualization skipped (demo mode). Use --turtle to auto-open.\n")
-
-        next_node = next((c.target for c in node.choices if c.key == user_choice), None)
-        if next_node is None:
-            print("Invalid choice. Please try again.")
-            continue
-
-        current = next_node
-        script_index += 1
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -379,8 +411,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     parser.add_argument(
         "--turtle",
         action="store_true",
-        help="Automatically open the turtle summary window after the story ends.",
-        help="Automatically open the turtle route view once the job offer is accepted.",
+        help="Automatically open the turtle route view when appropriate (map/summary).",
     )
     return parser.parse_args(argv)
 
@@ -390,7 +421,6 @@ def main(argv: List[str] | None = None) -> int:
     nodes = build_story()
     demo_choices = ["1", "1", "2", "1", "1", "1", "1", "1"] if args.demo else None
     play_story(nodes, scripted_choices=demo_choices, auto_turtle=args.turtle)
-    play_story(nodes, scripted_choices=demo_choices)
     return 0
 
 
