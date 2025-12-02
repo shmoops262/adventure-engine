@@ -249,6 +249,7 @@ def play_story(
     scripted_choices: List[str] | None = None,
     auto_turtle: bool = False,
 ) -> None:
+def play_story(nodes: Dict[str, StoryNode], scripted_choices: List[str] | None = None) -> None:
     current = "offer"
     script_index = 0
     map_announced = False
@@ -319,6 +320,7 @@ def main(argv: List[str] | None = None) -> int:
     nodes = build_story()
     demo_choices = ["1", "1", "2", "1", "1", "1", "1", "1"] if args.demo else None
     play_story(nodes, scripted_choices=demo_choices, auto_turtle=args.turtle)
+    play_story(nodes, scripted_choices=demo_choices)
     return 0
 
 

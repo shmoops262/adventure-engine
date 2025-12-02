@@ -18,6 +18,11 @@ python main.py --turtle     # Auto-open the turtle route view when the offer is 
 ```
 
 When playing interactively, enter the number for a choice or `Q` to exit at any time. Once you accept the offer, you'll be prompted to open a turtle window showing the route (or you can auto-open it with `--turtle`). The generated ASCII map can be opened with any text editor.
+python main.py          # Play interactively
+python main.py --demo   # Auto-play a sample path (useful for grading or quick checks)
+```
+
+When playing interactively, enter the number for a choice or `Q` to exit at any time. The generated ASCII map can be opened with any text editor.
 
 ## Project organization
 - `main.py` contains the engine logic, story graph, input handling, and map generation. Story content is defined in `build_story()` while navigation and I/O are handled by `play_story()`.
